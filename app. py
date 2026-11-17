@@ -6,41 +6,34 @@ from pathlib import Path
 
 app = FastAPI(
     title="BuildMaster AI",
-    description="Your Personal AI Software Builder",
     version="1.0.0"
 )
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-STATIC_DIR.mkdir(exist_ok=True)
-
-app.mount(
-    "/static",
-    StaticFiles(directory=str(STATIC_DIR)),
-    name="static"
-)
+if STATIC_DIR.exists():
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(STATIC_DIR)),
+        name="static"
+    )
 
 
 @app.get("/")
 def home():
     index_file = STATIC_DIR / "index.html"
-
     if index_file.exists():
         return FileResponse(index_file)
-
-    return {
-        "name": "BuildMaster AI",
-        "status": "Starting",
-        "message": "Your AI builder is being created."
-    }
+    return {"name": "BuildMaster AI", "status": "online"}
 
 
 @app.get("/api/health")
 def health():
     return {
         "status": "online",
-        "app": "BuildMaster AI"
+        "app": "BuildMaster AI",
+        "backend": "working"
     }
 
 
@@ -48,5 +41,5 @@ def health():
 def info():
     return {
         "name": "BuildMaster AI",
-        "purpose": "Build websites and applications using AI"
+        "purpose": "Personal AI Software Builder"
     }
