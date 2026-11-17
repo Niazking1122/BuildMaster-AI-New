@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#090d18">
+<title>BuildMaster AI</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#090d18;color:#f4f6ff;
+ font-family:Arial,sans-serif;min-height:100vh
+}
+header{
+ padding:18px 22px;border-bottom:1px solid #252c40;
+ display:flex;align-items:center;justify-content:space-between;
+ background:#101729
+}
+.logo{font-size:21px;font-weight:bold;color:#8b9cff}
+.logo span{color:white}
+.status{font-size:12px;color:#63e6a5}
+main{max-width:950px;margin:auto;padding:22px}
+.welcome{text-align:center;padding:35px 10px 20px}
+.welcome h1{font-size:32px;margin-bottom:10px}
+.welcome h1 span{color:#8b9cff}
+.welcome p{color:#aab4cb;line-height:1.7}
+.panel{
+ background:#111a2b;border:1px solid #27334d;
+ border-radius:17px;padding:18px;margin-top:18px
+}
+.panel h3{margin-top:0}
+textarea{
+ width:100%;min-height:110px;resize:vertical;
+ background:#090f1d;color:white;border:1px solid #35415e;
+ border-radius:12px;padding:14px;font-size:15px;
+ outline:none
+}
+button{
+ border:0;border-radius:10px;padding:12px 18px;
+ background:#6579f5;color:white;font-size:14px;
+ font-weight:bold;cursor:pointer
+}
+button:disabled{opacity:.5}
+.sendrow{display:flex;justify-content:flex-end;margin-top:12px}
+.messages{
+ display:flex;flex-direction:column;gap:12px;
+ max-height:430px;overflow:auto
+}
+.message{
+ padding:13px 15px;border-radius:13px;
+ line-height:1.6;white-space:pre-wrap;
+ overflow-wrap:anywhere
+}
+.user{background:#26365e;align-self:flex-end;max-width:90%}
+.ai{background:#1b263b;align-self:flex-start;max-width:95%}
+.small{font-size:12px;color:#9eabc5}
+input{
+ width:100%;padding:13px;background:#090f1d;
+ border:1px solid #35415e;border-radius:10px;
+ color:white;font-size:14px;margin:8px 0
+}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.secondary{background:#293650}
+footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
+</style>
+</head>
+
+<body>
+<header>
+ <div class="logo">✦ BuildMaster <span>AI</span></div>
+ <div class="status">● Personal AI Builder</div>
+</header>
+
+<main>
+ <section class="welcome">
+  <h1>Build anything with <span>AI</span></h1>
+  <p>Your personal software architect.<br>
+  Tell me your idea. Let's create it together.</p>
+ </section>
+
+ <section class="panel">
+  <h3>💬 AI Architect Chat</h3>
+  <div class="messages" id="messages">
+   <div class="message ai">
+    Hello! Welcome to BuildMaster AI.
+
+    Tell me what website, app or software you want to build. I'll help you plan it step by step.
+   </div>
+  </div>
+  <div style="margin-top:16px">
+   <textarea id="prompt" placeholder="Example: Build me a modern shopping website..."></textarea>
+   <div class="sendrow">
+    <button id="sendBtn" onclick="sendMessage()">Send Message ➤</button>
+   </div>
+   <p class="small" id="chatStatus">Ready to help you build.</p>
+  </div>
+ </section>
+
+ <section class="panel">
+  <h3>🧠 My Approved Memory</h3>
+  <p class="small">Save your preferences so your AI can use them in future conversations.</p>
+  <input id="preference" placeholder="Example: I prefer simple mobile-friendly designs">
+  <div class="actions">
+   <button onclick="savePreference()">Save Preference</button>
+   <button class="secondary" onclick="loadMemory()">Refresh Memory</button>
+  </div>
+  <div id="memoryList" class="small" style="margin-top:15px">Loading memory...</div>
+ </section>
+
+ <section class="panel">
+  <h3>🚀 Your Workspace</h3>
+  <p class="small">
+   Describe your project in the chat. Your AI architect will help you plan the design, features and code.
+  </p>
+  <button class="secondary" onclick="newChat()">New Conversation</button>
+ </section>
+</main>
+
+<footer>BuildMaster AI · Your ideas, your projects, your future.</footer>
+
+<script>
+const messages = document.getElementById("messages");
+const promptBox = document.getElementById("prompt");
+const sendBtn = document.getElementById("sendBtn");
+
+function addMessage(text, type){
+ const div = document.createElement("div");
+ div.className = "message " + type;
+ div.textContent = text;
+ messages.appendChild(div);
+ messages.scrollTop = messages.scrollHeight;
+}
+
+async function sendMessage(){
+ const message = promptBox.value.trim();
+ if(!message) return;
+
+ addMessage(message,"user");
+ promptBox.value = "";
+ sendBtn.disabled = true;
+ document.getElementById("chatStatus").textContent = "AI is thinking...";
+
+ try{
+  const response = await fetch("/api/chat",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({message})
+  });
+
+  const data = await response.json();
+  addMessage(data.reply || "No response received.","ai");
+ }catch(error){
+  addMessage("Connection error. Please check that the server is running.","ai");
+ }
+
+ sendBtn.disabled = false;
+ document.getElementById("chatStatus").textContent = "Ready to help you build.";
+ promptBox.focus();
+}
+
+promptBox.addEventListener("keydown",function(e){
+ if(e.key==="Enter" && !e.shiftKey){
+  e.preventDefault();
+  sendMessage();
+ }
+});
+
+async function loadMemory(){
+ const box = document.getElementById("memoryList");
+ try{
+  const response = await fetch("/api/memory");
+  const data = await response.json();
+  const preferences = data.preferences || [];
+
+  box.textContent = preferences.length
+   ? "Saved preferences: " + preferences.join(" • ")
+   : "No preferences saved yet.";
+ }catch(error){
+  box.textContent = "Could not load memory.";
+ }
+}
+
+async function savePreference(){
+ const input = document.getElementById("preference");
+ const value = input.value.trim();
+ if(!value) return;
+
+ try{
+  const response = await fetch("/api/memory");
+  const data = await response.json();
+  const preferences = data.preferences || [];
+
+  if(!preferences.includes(value)){
+   preferences.push(value);
+  }
+
+  await fetch("/api/memory",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({preferences})
+  });
+
+  input.value = "";
+  loadMemory();
+ }catch(error){
+  alert("Could not save preference.");
+ }
+}
+
+function newChat(){
+ messages.innerHTML = "";
+ addMessage("New conversation started. What would you like to build?","ai");
+}
+
+loadMemory();
+</script>
+</body>
+</html>
