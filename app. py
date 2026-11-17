@@ -9,25 +9,16 @@ app = FastAPI(title="BuildMaster AI", version="1.1.0")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-
-if STATIC_DIR.exists():
-    app.mount(
-        "/static",
-        StaticFiles(directory=str(STATIC_DIR)),
-        name="static"
-    )
-
-# Temporary memory for testing
 preferences = []
 
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 class ChatRequest(BaseModel):
     message: str
 
-
 class MemoryRequest(BaseModel):
     preferences: list[str]
-
 
 @app.get("/")
 def home():
@@ -36,69 +27,45 @@ def home():
         return FileResponse(index_file)
     return {"status": "online"}
 
-
 @app.get("/api/health")
 def health():
-    return {
-        "status": "online",
-        "app": "BuildMaster AI",
-        "backend": "working"
-    }
-
+    return {"status": "online", "app": "BuildMaster AI", "backend": "working"}
 
 @app.get("/api/info")
 def info():
-    return {
-        "name": "BuildMaster AI",
-        "purpose": "Personal AI Software Builder"
-    }
-
+    return {"name": "BuildMaster AI", "purpose": "Personal AI Software Builder"}
 
 @app.post("/api/chat")
 def chat(data: ChatRequest):
     message = data.message.strip()
-
     if not message:
         return {"reply": "Please tell me your idea."}
 
     memory_text = ""
     if preferences:
-        memory_text = (
-            "\n\nYour saved preferences: "
-            + "; ".join(preferences)
-        )
+        memory_text = "\n\nYour saved preferences: " + "; ".join(preferences)
 
     reply = (
         "I received your project idea!\n\n"
-        "Let's build it step by step.\n\n"
+        "Let's build it step by step.\n"
         "1. First, we will understand your idea.\n"
         "2. Then, we will plan the design and features.\n"
         "3. Next, we will prepare the code.\n"
         "4. Finally, we will test the project.\n\n"
-        "Your request: " + message
-        + memory_text
-        + "\n\nThis is the starter chat. "
-        "The real AI model will be connected next."
+        "Your request: " + message + memory_text +
+        "\n\nThis is the starter chat. The real AI model will be connected next."
     )
-
     return {"reply": reply}
-
 
 @app.get("/api/memory")
 def get_memory():
     return {"preferences": preferences}
 
-
 @app.post("/api/memory")
 def save_memory(data: MemoryRequest):
     preferences.clear()
-
     for item in data.preferences:
         item = item.strip()
         if item and item not in preferences:
             preferences.append(item)
-
-    return {
-        "status": "saved",
-        "preferences": preferences
-    }
+    return {"status": "saved", "preferences": preferences}
