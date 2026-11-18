@@ -1,257 +1,282 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#090d18">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BuildMaster AI</title>
-
 <style>
+:root {
+  --bg:#0b1020; --panel:#141c30; --text:#f4f6ff;
+  --muted:#9aa7c2; --line:#293550; --accent:#7667ff;
+  --input:#0d1528;
+}
+body.light {
+  --bg:#f3f5fb; --panel:#ffffff; --text:#172033;
+  --muted:#647089; --line:#dce2ef; --input:#f5f7fc;
+}
 *{box-sizing:border-box}
-body{margin:0;background:#090d18;color:#f4f6ff;font-family:Arial,sans-serif;min-height:100vh}
-header{padding:18px 22px;border-bottom:1px solid #252c40;display:flex;align-items:center;justify-content:space-between;background:#101729}
-.logo{font-size:21px;font-weight:bold;color:#8b9cff}
-.logo span{color:white}
-.status{font-size:12px;color:#63e6a5}
-main{max-width:950px;margin:auto;padding:22px}
-.welcome{text-align:center;padding:35px 10px 20px}
-.welcome h1{font-size:32px;margin-bottom:10px}
-.welcome h1 span{color:#8b9cff}
-.welcome p{color:#aab4cb;line-height:1.7}
-.panel{background:#111a2b;border:1px solid #27334d;border-radius:17px;padding:18px;margin-top:18px}
-.panel h3{margin-top:0}
-textarea{width:100%;min-height:110px;resize:vertical;background:#090f1d;color:white;border:1px solid #35415e;border-radius:12px;padding:14px;font-size:15px;outline:none}
-button{border:0;border-radius:10px;padding:12px 18px;background:#6579f5;color:white;font-size:14px;font-weight:bold;cursor:pointer}
-button:disabled{opacity:.5;cursor:not-allowed}
-.sendrow{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:12px}
-.messages{display:flex;flex-direction:column;gap:12px;max-height:430px;overflow:auto}
-.message{padding:13px 15px;border-radius:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
-.user{background:#26365e;align-self:flex-end;max-width:90%}
-.ai{background:#1b263b;align-self:flex-start;max-width:95%}
-.small{font-size:12px;color:#9eabc5}
-input{width:100%;padding:13px;background:#090f1d;border:1px solid #35415e;border-radius:10px;color:white;font-size:14px;margin:8px 0}
-.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-.secondary{background:#293650}
-.buildBtn{background:#168b68}
-footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
+body{margin:0;background:var(--bg);color:var(--text);
+font-family:Arial,sans-serif;min-height:100vh}
+header{height:65px;border-bottom:1px solid var(--line);
+display:flex;align-items:center;justify-content:space-between;
+padding:0 18px;background:var(--panel)}
+.logo{font-size:19px;font-weight:bold}
+.logo span{color:var(--accent)}
+button{border:0;border-radius:10px;padding:11px 15px;
+background:var(--accent);color:white;font-weight:bold;cursor:pointer}
+button.secondary{background:var(--input);color:var(--text);
+border:1px solid var(--line)}
+.layout{display:grid;grid-template-columns:245px 1fr;min-height:calc(100vh - 65px)}
+aside{padding:18px;border-right:1px solid var(--line);background:var(--panel)}
+main{padding:22px;max-width:1000px;width:100%;margin:auto}
+.nav{display:block;width:100%;text-align:left;margin:8px 0;
+background:transparent;color:var(--text);border:1px solid var(--line)}
+.nav.active{background:var(--accent);color:white}
+h1{font-size:27px;margin:10px 0}
+h2{font-size:19px}
+p{color:var(--muted);line-height:1.6}
+.card{background:var(--panel);border:1px solid var(--line);
+border-radius:16px;padding:18px;margin:15px 0}
+input,textarea{width:100%;padding:14px;background:var(--input);
+color:var(--text);border:1px solid var(--line);border-radius:10px;
+font:inherit;margin:8px 0}
+textarea{min-height:115px;resize:vertical}
+.actions{display:flex;gap:9px;flex-wrap:wrap}
+#messages{min-height:220px;max-height:430px;overflow:auto}
+.msg{padding:13px;border-radius:12px;margin:10px 0;
+background:var(--input);white-space:pre-wrap;line-height:1.5}
+.msg.user{border-left:4px solid var(--accent)}
+.msg.ai{border-left:4px solid #20b88a}
+.small{font-size:12px;color:var(--muted)}
+.page{display:none}.page.active{display:block}
+.item{padding:12px;border-bottom:1px solid var(--line)}
+.status{color:#20b88a;font-size:13px}
+@media(max-width:700px){
+ .layout{grid-template-columns:1fr}
+ aside{border-right:0;border-bottom:1px solid var(--line)}
+ .nav{display:inline-block;width:auto;margin:4px;padding:9px}
+ main{padding:14px}
+ header{padding:0 12px}
+}
 </style>
 </head>
-
 <body>
 <header>
- <div class="logo">✦ BuildMaster <span>AI</span></div>
- <div class="status">● Personal AI Builder</div>
+ <div class="logo">🚀 BuildMaster <span>AI</span></div>
+ <div class="actions">
+  <button class="secondary" onclick="toggleTheme()">☀️ / 🌙</button>
+  <button class="secondary" onclick="toggleLang()" id="lang">پښتو</button>
+ </div>
 </header>
 
+<div class="layout">
+<aside>
+ <button style="width:100%" onclick="newChat()" id="newBtn">＋ New Project</button>
+ <button class="nav active" onclick="showPage('chat',this)" id="chatNav">🤖 AI Architect</button>
+ <button class="nav" onclick="showPage('build',this)" id="buildNav">🛠️ Build Software</button>
+ <button class="nav" onclick="showPage('projects',this)" id="projectsNav">📁 My Projects</button>
+ <button class="nav" onclick="showPage('memory',this)" id="memoryNav">🧠 My Preferences</button>
+ <button class="nav" onclick="showPage('help',this)" id="helpNav">❓ Help</button>
+ <div class="card">
+  <b>BuildMaster AI</b>
+  <p class="small" id="tagline">Your personal software architect.</p>
+  <div id="apiStatus" class="status">Checking AI...</div>
+ </div>
+</aside>
+
 <main>
- <section class="welcome">
-  <h1>Build anything with <span>AI</span></h1>
-  <p>Your personal software architect.<br>
-  Tell me your idea. Let's create it together.</p>
- </section>
-
- <section class="panel">
-  <h3>💬 AI Architect Chat</h3>
-  <div class="messages" id="messages">
-   <div class="message ai">
-    Hello! Welcome to BuildMaster AI.
-
-    Tell me what website, app or software you want to build. I'll help you plan it step by step.
-   </div>
+<section class="page active" id="chat">
+ <h1 id="welcome">What do you want to build?</h1>
+ <p id="intro">Describe your idea. Your AI architect will help you plan and develop it.</p>
+ <div class="card">
+  <div id="messages">
+   <div class="msg ai" id="firstMsg">Hello! I am BuildMaster AI. Tell me your software idea.</div>
   </div>
-
-  <div style="margin-top:16px">
-   <textarea id="prompt" placeholder="Example: Build me a modern shopping website..."></textarea>
-   <div class="sendrow">
-    <button id="sendBtn" onclick="sendMessage()">Send Message ➤</button>
-    <button id="buildBtn" class="buildBtn" onclick="buildProject()">Build & Download ZIP ↓</button>
-   </div>
-   <p class="small" id="chatStatus">Ready to help you build.</p>
-  </div>
- </section>
-
- <section class="panel">
-  <h3>🧠 My Approved Memory</h3>
-  <p class="small">Save your preferences so your AI can use them in future conversations.</p>
-  <input id="preference" placeholder="Example: I prefer simple mobile-friendly designs">
+  <textarea id="prompt" placeholder="Describe your idea..."></textarea>
   <div class="actions">
-   <button onclick="savePreference()">Save Preference</button>
-   <button class="secondary" onclick="loadMemory()">Refresh Memory</button>
+   <button onclick="sendChat()" id="sendBtn">Send Message ➤</button>
+   <button class="secondary" onclick="clearChat()" id="clearBtn">Clear Chat</button>
   </div>
-  <div id="memoryList" class="small" style="margin-top:15px">Loading memory...</div>
- </section>
+ </div>
+ <div class="card">
+  <b id="ideasTitle">Quick ideas</b>
+  <div class="actions" style="margin-top:12px">
+   <button class="secondary" onclick="idea('Build a school management system')">School System</button>
+   <button class="secondary" onclick="idea('Build an online marketplace')">Marketplace</button>
+   <button class="secondary" onclick="idea('Build a social platform')">Social App</button>
+  </div>
+ </div>
+</section>
 
- <section class="panel">
-  <h3>🚀 Your Workspace</h3>
-  <p class="small">Describe your project in the chat. BuildMaster AI can help plan and generate your project files.</p>
-  <button class="secondary" onclick="newChat()">New Conversation</button>
- </section>
+<section class="page" id="build">
+ <h1 id="buildTitle">Build a complete project</h1>
+ <p id="buildIntro">Describe the application. AI will generate project files and package them into a ZIP.</p>
+ <div class="card">
+  <textarea id="buildPrompt" placeholder="Example: Build a school management system with admin, teachers and students..."></textarea>
+  <button onclick="buildProject()" id="buildBtn">Generate Project ZIP</button>
+  <p class="small" id="buildStatus">The generated ZIP will contain your project files.</p>
+ </div>
+</section>
+
+<section class="page" id="projects">
+ <h1 id="projectsTitle">My Projects</h1>
+ <p id="projectsIntro">Your recent project ideas are saved in this browser.</p>
+ <div class="card" id="projectList">No projects yet.</div>
+</section>
+
+<section class="page" id="memory">
+ <h1 id="memoryTitle">My Approved Preferences</h1>
+ <p id="memoryIntro">Add instructions you want your AI architect to use.</p>
+ <div class="card">
+  <textarea id="prefInput" placeholder="Example: Use simple design and explain in Pashto."></textarea>
+  <button onclick="savePreference()" id="saveBtn">Save Preference</button>
+  <div id="prefList"></div>
+ </div>
+</section>
+
+<section class="page" id="help">
+ <h1>BuildMaster AI</h1>
+ <div class="card">
+  <h2>How it works</h2>
+  <p>1. Describe your software idea in AI Architect.</p>
+  <p>2. Ask questions and improve your plan.</p>
+  <p>3. Open Build Software to generate project files.</p>
+  <p>4. Download the ZIP and follow its README instructions.</p>
+  <p>AI features require a working server and configured API key. Free services may have usage limits.</p>
+ </div>
+</section>
 </main>
-
-<footer>BuildMaster AI · Your ideas, your projects, your future.</footer>
+</div>
 
 <script>
-const messages = document.getElementById("messages");
-const promptBox = document.getElementById("prompt");
-const sendBtn = document.getElementById("sendBtn");
-const buildBtn = document.getElementById("buildBtn");
-const chatStatus = document.getElementById("chatStatus");
+let lang="en";
+let preferences=[];
+let projects=JSON.parse(localStorage.getItem("bm_projects")||"[]");
 
-function addMessage(text, type){
- const div = document.createElement("div");
- div.className = "message " + type;
- div.textContent = text;
- messages.appendChild(div);
- messages.scrollTop = messages.scrollHeight;
+const $=id=>document.getElementById(id);
+
+function toggleTheme(){
+ document.body.classList.toggle("light");
+ localStorage.setItem("bm_theme",document.body.classList.contains("light")?"light":"dark");
+}
+if(localStorage.getItem("bm_theme")==="light")document.body.classList.add("light");
+
+function toggleLang(){
+ lang=lang==="en"?"ps":"en";
+ $("lang").textContent=lang==="en"?"پښتو":"English";
+ $("welcome").textContent=lang==="en"?"What do you want to build?":"څه شی جوړول غواړې؟";
+ $("intro").textContent=lang==="en"?"Describe your idea. Your AI architect will help you plan and develop it.":"خپل نظر راته ولیکه. ستا AI مرستیال به د جوړولو په پلان او کوډ کې مرسته وکړي.";
+ $("sendBtn").textContent=lang==="en"?"Send Message ➤":"پیغام ولېږه ➤";
+ $("buildTitle").textContent=lang==="en"?"Build a complete project":"بشپړه پروژه جوړه کړه";
+ $("buildBtn").textContent=lang==="en"?"Generate Project ZIP":"د پروژې ZIP جوړ کړه";
+ $("saveBtn").textContent=lang==="en"?"Save Preference":"غوښتنه وساته";
+ $("chatNav").textContent=lang==="en"?"🤖 AI Architect":"🤖 AI معمار";
+ $("buildNav").textContent=lang==="en"?"🛠️ Build Software":"🛠️ سافټویر جوړول";
+ $("projectsNav").textContent=lang==="en"?"📁 My Projects":"📁 زما پروژې";
+ $("memoryNav").textContent=lang==="en"?"🧠 My Preferences":"🧠 زما خوښې";
+ $("helpNav").textContent=lang==="en"?"❓ Help":"❓ مرسته";
 }
 
-async function sendMessage(){
- const message = promptBox.value.trim();
- if(!message) return;
-
- addMessage(message,"user");
- promptBox.value = "";
- sendBtn.disabled = true;
- chatStatus.textContent = "AI is thinking...";
-
- try{
-  const response = await fetch("/api/chat",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({message})
-  });
-
-  const data = await response.json();
-
-  if(!response.ok){
-   throw new Error(data.error || "AI request failed");
-  }
-
-  addMessage(data.reply || "No response received.","ai");
- }catch(error){
-  addMessage("Error: " + error.message,"ai");
- }
-
- sendBtn.disabled = false;
- chatStatus.textContent = "Ready to help you build.";
- promptBox.focus();
+function showPage(id,btn){
+ document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+ $(id).classList.add("active");
+ document.querySelectorAll(".nav").forEach(b=>b.classList.remove("active"));
+ if(btn)btn.classList.add("active");
+ if(id==="projects")renderProjects();
+ if(id==="memory")renderPreferences();
 }
-
-async function buildProject(){
- const message = promptBox.value.trim();
-
- if(!message){
-  alert("Please describe the project you want to build first.");
-  promptBox.focus();
-  return;
- }
-
- buildBtn.disabled = true;
- sendBtn.disabled = true;
- chatStatus.textContent = "Building your project ZIP. Please wait...";
-
- try{
-  const response = await fetch("/api/build",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({message})
-  });
-
-  const contentType = response.headers.get("content-type") || "";
-
-  if(!response.ok || contentType.includes("application/json")){
-   let errorMessage = "Project build failed.";
-   try{
-    const data = await response.json();
-    errorMessage = data.error || data.detail || errorMessage;
-   }catch(e){}
-   throw new Error(errorMessage);
-  }
-
-  const blob = await response.blob();
-
-  if(blob.size === 0){
-   throw new Error("The ZIP file is empty.");
-  }
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "buildmaster-project.zip";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-  chatStatus.textContent = "Project ZIP downloaded successfully!";
-  addMessage("Your project ZIP has been generated. Check your Downloads folder.","ai");
-
- }catch(error){
-  chatStatus.textContent = "Project build failed.";
-  addMessage("Build error: " + error.message,"ai");
- }
-
- buildBtn.disabled = false;
- sendBtn.disabled = false;
-}
-
-promptBox.addEventListener("keydown",function(e){
- if(e.key==="Enter" && !e.shiftKey){
-  e.preventDefault();
-  sendMessage();
- }
-});
-
-async function loadMemory(){
- const box = document.getElementById("memoryList");
- try{
-  const response = await fetch("/api/memory");
-  const data = await response.json();
-  const preferences = data.preferences || [];
-
-  box.textContent = preferences.length
-   ? "Saved preferences: " + preferences.join(" • ")
-   : "No preferences saved yet.";
- }catch(error){
-  box.textContent = "Could not load memory.";
- }
-}
-
-async function savePreference(){
- const input = document.getElementById("preference");
- const value = input.value.trim();
- if(!value) return;
-
- try{
-  const response = await fetch("/api/memory");
-  const data = await response.json();
-  const preferences = data.preferences || [];
-
-  if(!preferences.includes(value)){
-   preferences.push(value);
-  }
-
-  await fetch("/api/memory",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({preferences})
-  });
-
-  input.value = "";
-  loadMemory();
- }catch(error){
-  alert("Could not save preference.");
- }
-}
-
 function newChat(){
- messages.innerHTML = "";
- addMessage("New conversation started. What would you like to build?","ai");
+ clearChat();
+ showPage("chat",document.querySelector(".nav"));
 }
-
-loadMemory();
+function idea(text){$("prompt").value=text;showPage("chat",document.querySelector(".nav"));}
+function addMessage(text,type){
+ const div=document.createElement("div");
+ div.className="msg "+type;div.textContent=text;
+ $("messages").appendChild(div);
+ $("messages").scrollTop=$("messages").scrollHeight;
+}
+function clearChat(){
+ $("messages").innerHTML='<div class="msg ai">Hello! I am BuildMaster AI. Tell me your software idea.</div>';
+}
+async function sendChat(){
+ const message=$("prompt").value.trim();
+ if(!message)return;
+ $("prompt").value="";
+ addMessage(message,"user");
+ addMessage("Thinking...","ai");
+ const box=$("messages").lastChild;
+ $("sendBtn").disabled=true;
+ try{
+  const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+  const data=await res.json();
+  box.textContent=data.reply||data.error||"No response received.";
+  projects.unshift({name:message.slice(0,65),date:new Date().toLocaleString()});
+  projects=projects.slice(0,30);
+  localStorage.setItem("bm_projects",JSON.stringify(projects));
+ }catch(e){box.textContent="Connection error. Check that the backend is running.";}
+ $("sendBtn").disabled=false;
+}
+async function buildProject(){
+ const message=$("buildPrompt").value.trim();
+ if(!message){$("buildStatus").textContent="Please describe your project first.";return;}
+ $("buildBtn").disabled=true;
+ $("buildStatus").textContent="AI is building your project. Please wait...";
+ try{
+  const res=await fetch("/api/build",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+  if(!res.ok){const err=await res.json();throw new Error(err.error||"Build failed");}
+  const blob=await res.blob();
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="buildmaster-project.zip";a.click();
+  URL.revokeObjectURL(url);
+  $("buildStatus").textContent="Project ZIP generated successfully!";
+  projects.unshift({name:message.slice(0,65),date:new Date().toLocaleString()});
+  localStorage.setItem("bm_projects",JSON.stringify(projects));
+ }catch(e){$("buildStatus").textContent="Error: "+e.message;}
+ $("buildBtn").disabled=false;
+}
+function renderProjects(){
+ $("projectList").innerHTML="";
+ if(!projects.length){$("projectList").textContent="No projects yet.";return;}
+ projects.forEach(p=>{
+  const d=document.createElement("div");d.className="item";
+  d.textContent="📁 "+p.name+" — "+p.date;
+  $("projectList").appendChild(d);
+ });
+}
+async function loadPreferences(){
+ try{
+  const r=await fetch("/api/memory");
+  const d=await r.json();
+  preferences=d.preferences||[];
+ }catch(e){preferences=[];}
+ renderPreferences();
+}
+async function savePreference(){
+ const value=$("prefInput").value.trim();
+ if(!value)return;
+ const next=[...preferences,value];
+ try{
+  const r=await fetch("/api/memory",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({preferences:next})});
+  const d=await r.json();preferences=d.preferences||next;
+  $("prefInput").value="";renderPreferences();
+ }catch(e){alert("Could not save preference. Check server connection.");}
+}
+function renderPreferences(){
+ $("prefList").innerHTML="";
+ preferences.forEach(p=>{
+  const d=document.createElement("div");d.className="item";d.textContent="✓ "+p;
+  $("prefList").appendChild(d);
+ });
+}
+async function checkHealth(){
+ try{
+  const r=await fetch("/api/health");const d=await r.json();
+  $("apiStatus").textContent=d.ai_configured?"● AI Connected":"● Server online — API key missing";
+ }catch(e){$("apiStatus").textContent="● Server not connected";}
+}
+loadPreferences();checkHealth();
 </script>
 </body>
 </html>
