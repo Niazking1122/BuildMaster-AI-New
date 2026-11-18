@@ -87,7 +87,7 @@ def chat(data: ChatRequest):
     url = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
     payload = {
-        "model": "gemini-3.8-flash",
+        "model": "gemini-3.7-flash",
         "input": prompt
     }
 
