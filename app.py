@@ -3,6 +3,8 @@ import os
 import io
 import re
 import json
+import time
+import random
 import zipfile
 import urllib.request
 import urllib.error
@@ -13,11 +15,20 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="BuildMaster AI", version="4.0")
+app = FastAPI(title="BuildMaster AI", version="5.0")
 
 BASE = Path(__file__).resolve().parent
 STATIC = BASE / "static"
 preferences = []
+
+# Try the current model first, then alternatives.
+GEMINI_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash"
+]
+
+RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 if STATIC.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
@@ -33,15 +44,12 @@ class MemoryRequest(BaseModel):
 
 def ask_gemini(prompt, json_mode=False):
     key = os.getenv("GEMINI_API_KEY")
-    if not key:
-        raise RuntimeError("Gemini API key is missing.")
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        "models/gemini-3.5-flash-lite:generateContent"
-    )
+    if not key:
+        raise RuntimeError("Gemini API key is missing in Vercel.")
 
     config = {"maxOutputTokens": 16000}
+
     if json_mode:
         config["responseMimeType"] = "application/json"
 
@@ -50,45 +58,90 @@ def ask_gemini(prompt, json_mode=False):
         "generationConfig": config
     }
 
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": key
-        },
-        method="POST"
-    )
+    last_error = "No Gemini model responded."
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as response:
-            result = json.loads(response.read().decode())
-    except urllib.error.HTTPError as error:
-        raise RuntimeError(
-            "Gemini API error: " +
-            error.read().decode(errors="replace")[:1000]
+    for model in GEMINI_MODELS:
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/"
+            f"models/{model}:generateContent"
         )
 
-    candidates = result.get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Gemini returned no response.")
+        for attempt in range(2):
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": key
+                },
+                method="POST"
+            )
 
-    parts = candidates[0].get("content", {}).get("parts", [])
-    reply = "\n".join(
-        p.get("text", "") for p in parts if p.get("text")
+            try:
+                with urllib.request.urlopen(req, timeout=120) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+
+                candidates = result.get("candidates", [])
+
+                if not candidates:
+                    last_error = f"{model}: Gemini returned no response."
+                    break
+
+                parts = candidates[0].get("content", {}).get("parts", [])
+
+                reply = "\n".join(
+                    part.get("text", "")
+                    for part in parts
+                    if part.get("text")
+                )
+
+                if reply.strip():
+                    return reply
+
+                last_error = f"{model}: Empty Gemini response."
+                break
+
+            except urllib.error.HTTPError as error:
+                body = error.read().decode(errors="replace")
+                last_error = f"{model}: HTTP {error.code}: {body[:700]}"
+
+                if error.code in RETRY_STATUSES:
+                    if attempt == 0:
+                        time.sleep(1.5 + random.random())
+                        continue
+                    break
+
+                if error.code == 404:
+                    break
+
+                raise RuntimeError(last_error)
+
+            except (urllib.error.URLError, TimeoutError, OSError) as error:
+                last_error = f"{model}: Connection error: {error}"
+
+                if attempt == 0:
+                    time.sleep(1.5 + random.random())
+                    continue
+
+                break
+
+            except Exception as error:
+                last_error = f"{model}: {str(error)}"
+                break
+
+    raise RuntimeError(
+        "All Gemini models failed. Please try again later. "
+        + last_error
     )
-
-    if not reply:
-        raise RuntimeError("Empty Gemini response.")
-
-    return reply
 
 
 @app.get("/")
 def home():
     file = STATIC / "index.html"
+
     if file.exists():
         return FileResponse(file)
+
     return {"status": "online"}
 
 
@@ -97,13 +150,16 @@ def health():
     return {
         "status": "online",
         "app": "BuildMaster AI",
-        "ai_configured": bool(os.getenv("GEMINI_API_KEY"))
+        "version": "5.0",
+        "ai_configured": bool(os.getenv("GEMINI_API_KEY")),
+        "models": GEMINI_MODELS
     }
 
 
 @app.post("/api/chat")
 def chat(data: ChatRequest):
     message = data.message.strip()
+
     if not message:
         return {"reply": "Please describe your idea."}
 
@@ -112,12 +168,15 @@ def chat(data: ChatRequest):
         "Help users plan, design, code and debug complete applications. "
         "Give practical code and simple explanations. "
         "Be honest about prototypes and limitations.\n\n"
-        "Saved preferences:\n" + "\n".join(preferences) +
-        "\n\nUser request:\n" + message
+        "Saved preferences:\n"
+        + "\n".join(preferences)
+        + "\n\nUser request:\n"
+        + message
     )
 
     try:
         return {"reply": ask_gemini(prompt)}
+
     except Exception as error:
         return {"reply": str(error)}
 
@@ -142,26 +201,28 @@ def build_project(data: ChatRequest):
         '{"path":"src/main.py","content":"complete source code"}]}\n'
         "Project requirements:\n"
         "1. Create a sensible folder structure and separate files by purpose. "
-        "Include frontend, backend, and database/schema files when the app needs them. "
-        "2. Implement the requested features end-to-end. If the user asks for "
-        "accounts, login, roles, or saved records, build real backend routes and "
-        "persistent database integration; do not fake these with browser-only state. "
-        "3. Use secure password hashing and server-side authorization for login apps. "
+        "Include frontend, backend, and database/schema files when needed. "
+        "2. Implement requested features end-to-end. If the user asks for "
+        "accounts, login, roles, or saved records, build real backend routes "
+        "and persistent database integration; do not fake these with browser-only state. "
+        "3. Use secure password hashing and server-side authorization. "
         "Never store plaintext passwords. Include input validation and safe defaults. "
         "4. Include a .env.example with placeholder variable names only, never real secrets. "
-        "5. Include dependency files such as requirements.txt or package.json, "
-        "database setup/schema or migrations where appropriate, and a detailed README "
-        "with installation, environment setup, database setup, run, and test instructions. "
+        "5. Include requirements.txt or package.json, database setup/schema or migrations "
+        "where appropriate, and a detailed README with installation, environment setup, "
+        "database setup, run, and test instructions. "
         "6. Add useful error handling and a basic test or health-check when appropriate. "
-        "7. If a feature requires an external service or credential, explain setup in README "
-        "and use environment variables. Do not claim that an external service is already connected. "
+        "7. Explain external service setup in README and use environment variables. "
+        "Do not claim an external service is already connected. "
         "8. Do not include passwords, API keys, tokens, or other secrets. "
         "Use relative file paths only; never use absolute paths or ../. "
-        "Maximum 20 files, each file must be under 300 KB. "
-        "Make the result coherent: imports, routes, filenames, and README commands must match. "
+        "Maximum 20 files, each file under 300 KB. "
+        "Make imports, routes, filenames, and README commands match. "
         "Do not output markdown fences or explanations outside the JSON.\n\n"
-        "User preferences:\n" + "\n".join(preferences) +
-        "\n\nApplication request:\n" + message
+        "User preferences:\n"
+        + "\n".join(preferences)
+        + "\n\nApplication request:\n"
+        + message
     )
 
     try:
@@ -185,11 +246,15 @@ def build_project(data: ChatRequest):
         ) as archive:
 
             for item in files[:20]:
+                if not isinstance(item, dict):
+                    continue
+
                 path = str(item.get("path", "")).replace("\\", "/")
                 content = item.get("content", "")
 
                 if (
-                    not path or path.startswith("/")
+                    not path
+                    or path.startswith("/")
                     or ".." in Path(path).parts
                     or not isinstance(content, str)
                     or len(content.encode("utf-8")) > 300000
@@ -200,7 +265,7 @@ def build_project(data: ChatRequest):
                 count += 1
 
         if count == 0:
-            raise ValueError("No valid files were generated.")
+            raise ValueError("No valid project files were generated.")
 
         buffer.seek(0)
 
@@ -237,7 +302,11 @@ def save_memory(data: MemoryRequest):
 
     for item in data.preferences:
         item = item.strip()
+
         if item and item not in preferences:
             preferences.append(item)
 
-    return {"status": "saved", "preferences": preferences}
+    return {
+        "status": "saved",
+        "preferences": preferences
+    }
