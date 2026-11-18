@@ -1,11 +1,16 @@
 
+import os
+import json
+import urllib.request
+import urllib.error
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from pathlib import Path
 
-app = FastAPI(title="BuildMaster AI", version="1.1.0")
+app = FastAPI(title="BuildMaster AI", version="2.0.0")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -36,7 +41,8 @@ def health():
     return {
         "status": "online",
         "app": "BuildMaster AI",
-        "backend": "working"
+        "backend": "working",
+        "ai_configured": bool(os.getenv("GEMINI_API_KEY"))
     }
 
 
@@ -55,22 +61,69 @@ def chat(data: ChatRequest):
     if not message:
         return {"reply": "Please tell me your idea."}
 
-    reply = (
-        "Welcome to BuildMaster AI!\n\n"
-        "I received your idea:\n"
-        + message
-        + "\n\nLet's build it step by step:\n"
-        "1. Understand your idea.\n"
-        "2. Plan the design.\n"
-        "3. Prepare the code.\n"
-        "4. Test the project.\n\n"
-        "This is a starter response. Real AI connection is coming next."
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        return {"reply": "Gemini API key is missing. Please check Vercel Environment Variables."}
+
+    memory = "\n".join(preferences)
+
+    system_instruction = (
+        "You are BuildMaster AI, a helpful personal software architect "
+        "and app builder. Help users plan, design, build, debug and improve "
+        "websites and applications. Give complete practical code when asked. "
+        "Explain steps simply. Remember the user's preferences supplied "
+        "in the conversation context."
     )
 
-    if preferences:
-        reply += "\n\nYour saved preferences: " + "; ".join(preferences)
+    prompt = (
+        system_instruction
+        + "\n\nSaved user preferences:\n"
+        + (memory if memory else "No saved preferences yet.")
+        + "\n\nUser request:\n"
+        + message
+    )
 
-    return {"reply": reply}
+    url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+
+    payload = {
+        "model": "gemini-3.8-flash",
+        "input": prompt
+    }
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            result = json.loads(response.read().decode("utf-8"))
+
+        reply = result.get("output_text", "")
+
+        if not reply:
+            for step in result.get("steps", []):
+                for part in step.get("content", {}).get("parts", []):
+                    if part.get("text"):
+                        reply += part["text"]
+
+        if not reply:
+            reply = "Gemini responded, but no text was returned."
+
+        return {"reply": reply}
+
+    except urllib.error.HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        return {"reply": "Gemini API error: " + details[:1200]}
+
+    except Exception as error:
+        return {"reply": "Connection error: " + str(error)}
 
 
 @app.get("/api/memory")
@@ -81,6 +134,7 @@ def get_memory():
 @app.post("/api/memory")
 def save_memory(data: MemoryRequest):
     preferences.clear()
+
     for item in data.preferences:
         item = item.strip()
         if item and item not in preferences:
