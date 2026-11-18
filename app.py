@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="BuildMaster AI", version="3.0")
+app = FastAPI(title="BuildMaster AI", version="4.0")
 
 BASE = Path(__file__).resolve().parent
 STATIC = BASE / "static"
@@ -133,16 +133,33 @@ def build_project(data: ChatRequest):
         )
 
     prompt = (
-        "You are an expert full-stack developer. Build a runnable "
-        "starter project for the user's application. Return ONLY valid "
-        "JSON in this exact format:\n"
+        "You are BuildMaster AI, a senior full-stack software architect "
+        "and developer. Generate a complete, runnable multi-file project, "
+        "not just a demo snippet. Choose a suitable technology stack based "
+        "on the user's request and keep setup simple.\n"
+        "Return ONLY valid JSON in this exact format: "
         '{"project_name":"my-app","files":['
-        '{"path":"index.html","content":"complete source code"}]}\n'
-        "Include all necessary files and a README with instructions. "
-        "For backend apps include requirements.txt or package.json. "
-        "Do not include passwords, API keys or secrets. "
-        "Use relative file paths only. Do not use ../ or absolute paths. "
-        "Maximum 20 files. Make the project practical and runnable.\n\n"
+        '{"path":"src/main.py","content":"complete source code"}]}\n'
+        "Project requirements:\n"
+        "1. Create a sensible folder structure and separate files by purpose. "
+        "Include frontend, backend, and database/schema files when the app needs them. "
+        "2. Implement the requested features end-to-end. If the user asks for "
+        "accounts, login, roles, or saved records, build real backend routes and "
+        "persistent database integration; do not fake these with browser-only state. "
+        "3. Use secure password hashing and server-side authorization for login apps. "
+        "Never store plaintext passwords. Include input validation and safe defaults. "
+        "4. Include a .env.example with placeholder variable names only, never real secrets. "
+        "5. Include dependency files such as requirements.txt or package.json, "
+        "database setup/schema or migrations where appropriate, and a detailed README "
+        "with installation, environment setup, database setup, run, and test instructions. "
+        "6. Add useful error handling and a basic test or health-check when appropriate. "
+        "7. If a feature requires an external service or credential, explain setup in README "
+        "and use environment variables. Do not claim that an external service is already connected. "
+        "8. Do not include passwords, API keys, tokens, or other secrets. "
+        "Use relative file paths only; never use absolute paths or ../. "
+        "Maximum 20 files, each file must be under 300 KB. "
+        "Make the result coherent: imports, routes, filenames, and README commands must match. "
+        "Do not output markdown fences or explanations outside the JSON.\n\n"
         "User preferences:\n" + "\n".join(preferences) +
         "\n\nApplication request:\n" + message
     )
