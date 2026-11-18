@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-app = FastAPI(title="BuildMaster AI", version="2.0.0")
+app = FastAPI(title="BuildMaster AI", version="2.1.0")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -64,31 +64,34 @@ def chat(data: ChatRequest):
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
-        return {"reply": "Gemini API key is missing. Please check Vercel Environment Variables."}
+        return {"reply": "GEMINI_API_KEY is missing in Vercel."}
 
     memory = "\n".join(preferences)
 
-    system_instruction = (
-        "You are BuildMaster AI, a helpful personal software architect "
-        "and app builder. Help users plan, design, build, debug and improve "
-        "websites and applications. Give complete practical code when asked. "
-        "Explain steps simply. Remember the user's preferences supplied "
-        "in the conversation context."
-    )
-
     prompt = (
-        system_instruction
-        + "\n\nSaved user preferences:\n"
-        + (memory if memory else "No saved preferences yet.")
+        "You are BuildMaster AI, a personal software architect "
+        "and app builder. Help users plan, design, code, debug "
+        "and improve websites and apps. Give complete working "
+        "code when requested. Explain steps simply.\n\n"
+        "Saved user preferences:\n"
+        + (memory if memory else "No saved preferences.")
         + "\n\nUser request:\n"
         + message
     )
 
-    url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        "models/gemini-3.5-flash-lite:generateContent"
+    )
 
     payload = {
-        "model": "gemini-3.7-flash",
-        "input": prompt
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
     }
 
     request = urllib.request.Request(
@@ -105,18 +108,20 @@ def chat(data: ChatRequest):
         with urllib.request.urlopen(request, timeout=90) as response:
             result = json.loads(response.read().decode("utf-8"))
 
-        reply = result.get("output_text", "")
+        candidates = result.get("candidates", [])
 
-        if not reply:
-            for step in result.get("steps", []):
-                for part in step.get("content", {}).get("parts", []):
-                    if part.get("text"):
-                        reply += part["text"]
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            reply = "\n".join(
+                part.get("text", "")
+                for part in parts
+                if part.get("text")
+            )
 
-        if not reply:
-            reply = "Gemini responded, but no text was returned."
+            if reply:
+                return {"reply": reply}
 
-        return {"reply": reply}
+        return {"reply": "Gemini returned no text. Please try again."}
 
     except urllib.error.HTTPError as error:
         details = error.read().decode("utf-8", errors="replace")
