@@ -9,15 +9,8 @@
 
 <style>
 *{box-sizing:border-box}
-body{
- margin:0;background:#090d18;color:#f4f6ff;
- font-family:Arial,sans-serif;min-height:100vh
-}
-header{
- padding:18px 22px;border-bottom:1px solid #252c40;
- display:flex;align-items:center;justify-content:space-between;
- background:#101729
-}
+body{margin:0;background:#090d18;color:#f4f6ff;font-family:Arial,sans-serif;min-height:100vh}
+header{padding:18px 22px;border-bottom:1px solid #252c40;display:flex;align-items:center;justify-content:space-between;background:#101729}
 .logo{font-size:21px;font-weight:bold;color:#8b9cff}
 .logo span{color:white}
 .status{font-size:12px;color:#63e6a5}
@@ -26,43 +19,21 @@ main{max-width:950px;margin:auto;padding:22px}
 .welcome h1{font-size:32px;margin-bottom:10px}
 .welcome h1 span{color:#8b9cff}
 .welcome p{color:#aab4cb;line-height:1.7}
-.panel{
- background:#111a2b;border:1px solid #27334d;
- border-radius:17px;padding:18px;margin-top:18px
-}
+.panel{background:#111a2b;border:1px solid #27334d;border-radius:17px;padding:18px;margin-top:18px}
 .panel h3{margin-top:0}
-textarea{
- width:100%;min-height:110px;resize:vertical;
- background:#090f1d;color:white;border:1px solid #35415e;
- border-radius:12px;padding:14px;font-size:15px;
- outline:none
-}
-button{
- border:0;border-radius:10px;padding:12px 18px;
- background:#6579f5;color:white;font-size:14px;
- font-weight:bold;cursor:pointer
-}
-button:disabled{opacity:.5}
-.sendrow{display:flex;justify-content:flex-end;margin-top:12px}
-.messages{
- display:flex;flex-direction:column;gap:12px;
- max-height:430px;overflow:auto
-}
-.message{
- padding:13px 15px;border-radius:13px;
- line-height:1.6;white-space:pre-wrap;
- overflow-wrap:anywhere
-}
+textarea{width:100%;min-height:110px;resize:vertical;background:#090f1d;color:white;border:1px solid #35415e;border-radius:12px;padding:14px;font-size:15px;outline:none}
+button{border:0;border-radius:10px;padding:12px 18px;background:#6579f5;color:white;font-size:14px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.sendrow{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:12px}
+.messages{display:flex;flex-direction:column;gap:12px;max-height:430px;overflow:auto}
+.message{padding:13px 15px;border-radius:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 .user{background:#26365e;align-self:flex-end;max-width:90%}
 .ai{background:#1b263b;align-self:flex-start;max-width:95%}
 .small{font-size:12px;color:#9eabc5}
-input{
- width:100%;padding:13px;background:#090f1d;
- border:1px solid #35415e;border-radius:10px;
- color:white;font-size:14px;margin:8px 0
-}
+input{width:100%;padding:13px;background:#090f1d;border:1px solid #35415e;border-radius:10px;color:white;font-size:14px;margin:8px 0}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .secondary{background:#293650}
+.buildBtn{background:#168b68}
 footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
 </style>
 </head>
@@ -89,10 +60,12 @@ footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
     Tell me what website, app or software you want to build. I'll help you plan it step by step.
    </div>
   </div>
+
   <div style="margin-top:16px">
    <textarea id="prompt" placeholder="Example: Build me a modern shopping website..."></textarea>
    <div class="sendrow">
     <button id="sendBtn" onclick="sendMessage()">Send Message ➤</button>
+    <button id="buildBtn" class="buildBtn" onclick="buildProject()">Build & Download ZIP ↓</button>
    </div>
    <p class="small" id="chatStatus">Ready to help you build.</p>
   </div>
@@ -111,9 +84,7 @@ footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
 
  <section class="panel">
   <h3>🚀 Your Workspace</h3>
-  <p class="small">
-   Describe your project in the chat. Your AI architect will help you plan the design, features and code.
-  </p>
+  <p class="small">Describe your project in the chat. BuildMaster AI can help plan and generate your project files.</p>
   <button class="secondary" onclick="newChat()">New Conversation</button>
  </section>
 </main>
@@ -124,6 +95,8 @@ footer{text-align:center;color:#78849e;padding:25px;font-size:12px}
 const messages = document.getElementById("messages");
 const promptBox = document.getElementById("prompt");
 const sendBtn = document.getElementById("sendBtn");
+const buildBtn = document.getElementById("buildBtn");
+const chatStatus = document.getElementById("chatStatus");
 
 function addMessage(text, type){
  const div = document.createElement("div");
@@ -140,7 +113,7 @@ async function sendMessage(){
  addMessage(message,"user");
  promptBox.value = "";
  sendBtn.disabled = true;
- document.getElementById("chatStatus").textContent = "AI is thinking...";
+ chatStatus.textContent = "AI is thinking...";
 
  try{
   const response = await fetch("/api/chat",{
@@ -150,14 +123,78 @@ async function sendMessage(){
   });
 
   const data = await response.json();
+
+  if(!response.ok){
+   throw new Error(data.error || "AI request failed");
+  }
+
   addMessage(data.reply || "No response received.","ai");
  }catch(error){
-  addMessage("Connection error. Please check that the server is running.","ai");
+  addMessage("Error: " + error.message,"ai");
  }
 
  sendBtn.disabled = false;
- document.getElementById("chatStatus").textContent = "Ready to help you build.";
+ chatStatus.textContent = "Ready to help you build.";
  promptBox.focus();
+}
+
+async function buildProject(){
+ const message = promptBox.value.trim();
+
+ if(!message){
+  alert("Please describe the project you want to build first.");
+  promptBox.focus();
+  return;
+ }
+
+ buildBtn.disabled = true;
+ sendBtn.disabled = true;
+ chatStatus.textContent = "Building your project ZIP. Please wait...";
+
+ try{
+  const response = await fetch("/api/build",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({message})
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if(!response.ok || contentType.includes("application/json")){
+   let errorMessage = "Project build failed.";
+   try{
+    const data = await response.json();
+    errorMessage = data.error || data.detail || errorMessage;
+   }catch(e){}
+   throw new Error(errorMessage);
+  }
+
+  const blob = await response.blob();
+
+  if(blob.size === 0){
+   throw new Error("The ZIP file is empty.");
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "buildmaster-project.zip";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+  chatStatus.textContent = "Project ZIP downloaded successfully!";
+  addMessage("Your project ZIP has been generated. Check your Downloads folder.","ai");
+
+ }catch(error){
+  chatStatus.textContent = "Project build failed.";
+  addMessage("Build error: " + error.message,"ai");
+ }
+
+ buildBtn.disabled = false;
+ sendBtn.disabled = false;
 }
 
 promptBox.addEventListener("keydown",function(e){
