@@ -273,3 +273,10 @@ def save_memory(data: MemoryRequest):
         return {"status": "saved", "persistent": persistent, "preferences": preferences}
     except Exception as error:
         return JSONResponse({"error": "Could not save shared memory to Supabase: " + str(error)}, status_code=502)
+@app.get("/api/memory/test")
+def test_memory():
+    try:
+        rows = supabase_request("bm_shared_memories?select=id,content")
+        return {"status": "success", "data": rows}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
